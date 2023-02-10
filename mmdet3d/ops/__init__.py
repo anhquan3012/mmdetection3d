@@ -28,6 +28,7 @@ from .pointnet_modules import (PAConvCUDASAModule, PAConvCUDASAModuleMSG,
                                build_sa_module)
 from .sparse_block import (SparseBasicBlock, SparseBottleneck,
                            make_sparse_convmodule)
+from .votr_ops import votr_utils
 
 __all__ = [
     'nms', 'soft_nms', 'RoIAlign', 'roi_align', 'get_compiler_version',
