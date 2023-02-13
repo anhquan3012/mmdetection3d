@@ -82,8 +82,8 @@ class SECONDFPN(BaseModule):
             list[torch.Tensor]: Multi-level feature maps.
         """
         assert len(x) == len(self.in_channels)
-        ups = [deblock(x[i]) for i, deblock in enumerate(self.deblocks)]
-
+        
+        ups = [deblock(x[i]) for i, deblock in enumerate(self.deblocks)]       
         if len(ups) > 1:
             out = torch.cat(ups, dim=1)
         else:

@@ -6,10 +6,10 @@ from ...ops.votr_ops import votr_utils
 from mmdet3d.ops.spconv import IS_SPCONV2_AVAILABLE
 from ..builder import MIDDLE_ENCODERS
 
-if IS_SPCONV2_AVAILABLE:
-    from spconv.pytorch import SparseConvTensor, SparseSequential
-else:
-    from mmcv.ops import SparseConvTensor, SparseSequential
+# if IS_SPCONV2_AVAILABLE:
+#     from spconv.pytorch import SparseConvTensor, SparseSequential
+# else:
+#     from mmcv.ops import SparseConvTensor, SparseSequential
 
 from mmcv.ops import scatter_nd
 
@@ -206,6 +206,7 @@ class SparseAttention3d(Attention3d):
             key_coords = key_coords - query_coords.unsqueeze(-1) # (N, 3, size)
 
         key_pos_emb = self.k_pos_proj(key_coords)
+
         key_features = key_features + key_pos_emb
         key_features = key_features.permute(2, 0, 1).contiguous() # (size, N1+N2, C)
 
@@ -294,7 +295,6 @@ class SubMAttention3d(Attention3d):
 
         key_indices = torch.cat(a_key_indices, dim = 1)
         key_mask = torch.cat(a_key_mask, dim = 1)
-
         query_features = voxel_features.unsqueeze(0) # (1, N1+N2, C)
         key_features = votr_utils.grouping_operation(voxel_features, v_bs_cnt, key_indices, k_bs_cnt)
 
@@ -311,7 +311,6 @@ class SubMAttention3d(Attention3d):
             else:
                 query_pos_emb = self.q_pos_proj(voxel_coords).unsqueeze(0)
                 query_features = query_features + query_pos_emb
-
         key_features = key_features.permute(2, 0, 1).contiguous() # (size, N1+N2, C)
 
         attend_features, attend_weights = self.mhead_attention(
@@ -426,5 +425,4 @@ class VoxelTransformer(nn.Module):
         spatial_features = sp_tensor.dense()
         N, C, D, H, W = spatial_features.shape
         spatial_features = spatial_features.view(N, C * D, H, W)
-        
         return spatial_features

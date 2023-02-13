@@ -10,34 +10,35 @@ model = dict(
     type='VoxelNet',
     voxel_layer=dict(
         max_num_points=5,
-        point_cloud_range=[0, -40, -3, 100, 40, 1],
+        point_cloud_range=point_cloud_range,
         voxel_size=voxel_size,
         max_voxels=(16000, 40000)),
     voxel_encoder=dict(type='HardSimpleVFE'),
     middle_encoder=dict(
         type='VoxelTransformer',
         in_channels=4,
-        sparse_shape=[41, 1600, 1408],
+        sparse_shape=[2000, 1600, 41],
         voxel_size=voxel_size,
         use_relative_coords = True,
         use_pooled_feature = True,
         use_no_query_coords = True,
         num_point_features = 64,
         hash_size = 400000,
+        point_cloud_range = point_cloud_range,
         layers_list = [
             dict(
                 SP_CFGS = dict(
                     CHANNELS = [16, 32, 32],
                     DROPOUT = 0,
                     NUM_HEADS = 4,
-                    ATTENTION = dict(
+                    ATTENTION = [dict(
                         NAME = 'StridedAttention',
                         SIZE = 48,
                         RANGE_SPEC = [[0, 2, 1, 0, 2, 1, 0, 2, 1], 
                                       [2, 5, 1, 2, 5, 1, 0, 3, 1], 
                                       [5, 25, 5, 5, 25, 5, 0, 15, 2], 
                                       [25, 125, 25, 25, 125, 25, 0, 15, 3]],
-                    ),
+                    )],
                     STRIDE = [2, 2, 2],
                     NUM_DS_VOXELS = 90000
                 ),
@@ -46,14 +47,14 @@ model = dict(
                     CHANNELS = [32, 32, 32],
                     DROPOUT = 0,
                     NUM_HEADS = 4,
-                    ATTENTION = dict(
+                    ATTENTION = [dict(
                         NAME = 'StridedAttention',
                         SIZE = 48,
                         RANGE_SPEC = [[0, 2, 1, 0, 2, 1, 0, 2, 1], 
                                       [2, 4, 1, 2, 4, 1, 0, 3, 1], 
                                       [4, 12, 3, 4, 12, 3, 0, 8, 2], 
                                       [12, 60, 12, 12, 60, 12, 0, 8, 2]],
-                    ),
+                    )],
                     USE_POS_EMB = True
                 )
             ),
@@ -62,14 +63,14 @@ model = dict(
                     CHANNELS = [32, 64, 64],
                     DROPOUT = 0,
                     NUM_HEADS = 4,
-                    ATTENTION = dict(
+                    ATTENTION = [dict(
                         NAME = 'StridedAttention',
                         SIZE = 48,
                         RANGE_SPEC = [[0, 2, 1, 0, 2, 1, 0, 2, 1], 
                                       [2, 4, 1, 2, 4, 1, 0, 3, 1], 
                                       [4, 12, 3, 4, 12, 3, 0, 8, 2], 
                                       [12, 60, 12, 12, 60, 12, 0, 8, 2]],
-                    ),
+                    )],
                     STRIDE = [2, 2, 2],
                     NUM_DS_VOXELS = 90000
                 ),
@@ -78,30 +79,30 @@ model = dict(
                     CHANNELS = [64, 64, 64],
                     DROPOUT = 0,
                     NUM_HEADS = 4,
-                    ATTENTION = dict(
+                    ATTENTION = [dict(
                         NAME = 'StridedAttention',
                         SIZE = 48,
                         RANGE_SPEC = [[0, 2, 1, 0, 2, 1, 0, 2, 1], 
                                       [2, 3, 1, 2, 3, 1, 0, 2, 1], 
                                       [3, 8, 2, 3, 8, 2, 0, 4, 1], 
                                       [8, 32, 8, 8, 32, 8, 0, 4, 1]],
-                    ),
+                    )],
                     USE_POS_EMB = True
                 )
             ),
             dict(
                 SP_CFGS = dict(
-                    CHANNELS = [32, 64, 64],
+                    CHANNELS = [64, 64, 64],
                     DROPOUT = 0,
                     NUM_HEADS = 4,
-                    ATTENTION = dict(
+                    ATTENTION = [dict(
                         NAME = 'StridedAttention',
                         SIZE = 48,
                         RANGE_SPEC = [[0, 2, 1, 0, 2, 1, 0, 2, 1], 
                                       [2, 3, 1, 2, 3, 1, 0, 2, 1], 
                                       [3, 8, 2, 3, 8, 2, 0, 4, 1], 
                                       [8, 32, 8, 8, 32, 8, 0, 4, 1]],
-                    ),
+                    )],
                     STRIDE = [2, 2, 2],
                     NUM_DS_VOXELS = 90000
                 ),
@@ -110,13 +111,13 @@ model = dict(
                     CHANNELS = [64, 64, 64],
                     DROPOUT = 0,
                     NUM_HEADS = 4,
-                    ATTENTION = dict(
+                    ATTENTION = [dict(
                         NAME = 'StridedAttention',
                         SIZE = 48,
                         RANGE_SPEC = [[0, 2, 1, 0, 2, 1, 0, 2, 1], 
                                       [2, 4, 1, 2, 4, 1, 0, 3, 1], 
                                       [4, 16, 2, 4, 16, 2, 0, 5, 1]],
-                    ),
+                    )],
                     USE_POS_EMB = True
                 )
             )
@@ -124,7 +125,7 @@ model = dict(
     ),
     backbone=dict(
         type='SECOND',
-        in_channels=256,
+        in_channels=320,
         layer_nums=[5, 5],
         layer_strides=[1, 2],
         out_channels=[128, 256]),
@@ -159,7 +160,8 @@ model = dict(
             loss_weight=1.0),
         loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=2.0),
         loss_dir=dict(
-            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=0.2)),
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=0.2)
+        ),
     # model training and testing settings
     train_cfg=dict(
         assigner=[
@@ -343,7 +345,7 @@ data = dict(
         file_client_args=file_client_args))
 
 evaluation = dict(interval=1, pipeline=eval_pipeline)
-work_dir = '/media/ntu/volume1/home/s122md304_13/quan_fyp/train_kitti/votr'
+work_dir = '/media/ntu/volume1/home/s122md304_13/quan_fyp/train_kitti/test'
 
 checkpoint_config = dict(interval=10)
 log_config = dict(
@@ -353,4 +355,20 @@ log_config = dict(
         dict(type='TensorboardLoggerHook')
     ])
 
-runner = dict(type='EpochBasedRunner', max_epochs=80)
+lr = 0.0006
+optimizer = dict(type='AdamW', lr=lr, betas=(0.95, 0.99), weight_decay=0.01)
+
+lr_config = dict(
+    policy='cyclic',
+    target_ratio=(10, 1e-4),
+    cyclic_times=1,
+    step_ratio_up=0.4,
+)
+momentum_config = dict(
+    policy='cyclic',
+    target_ratio=(0.85 / 0.95, 1),
+    cyclic_times=1,
+    step_ratio_up=0.4,
+)
+
+runner = dict(type='EpochBasedRunner', max_epochs=100)

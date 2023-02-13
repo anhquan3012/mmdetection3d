@@ -43,8 +43,7 @@ class HardSimpleVFE(nn.Module):
         points_mean = features[:, :, :self.num_features].sum(
             dim=1, keepdim=False) / num_points.type_as(features).view(-1, 1)
         return points_mean.contiguous()
-
-
+    
 @VOXEL_ENCODERS.register_module()
 class DynamicSimpleVFE(nn.Module):
     """Simple dynamic voxel feature encoder used in DV-SECOND.
