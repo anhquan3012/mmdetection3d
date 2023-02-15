@@ -355,7 +355,7 @@ log_config = dict(
         dict(type='TensorboardLoggerHook')
     ])
 
-lr = 0.0006
+lr = 0.0002
 optimizer = dict(type='AdamW', lr=lr, betas=(0.95, 0.99), weight_decay=0.01)
 
 lr_config = dict(
