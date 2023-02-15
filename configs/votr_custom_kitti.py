@@ -360,7 +360,7 @@ optimizer = dict(type='AdamW', lr=lr, betas=(0.95, 0.99), weight_decay=0.01)
 
 lr_config = dict(
     policy='cyclic',
-    target_ratio=(10, 1e-4),
+    target_ratio=(3, 1e-2),
     cyclic_times=1,
     step_ratio_up=0.4,
 )
