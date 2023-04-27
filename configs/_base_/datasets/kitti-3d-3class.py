@@ -1,6 +1,6 @@
 # dataset settings
 dataset_type = 'KittiDataset'
-data_root = 'data/kitti/'
+data_root = '/media/ntu/volume1/home/s122md304_13/quan_fyp/kitti/'
 class_names = ['Pedestrian', 'Cyclist', 'Car']
 point_cloud_range = [0, -40, -3, 70.4, 40, 1]
 input_modality = dict(use_lidar=True, use_camera=False)
@@ -154,4 +154,4 @@ data = dict(
         box_type_3d='LiDAR',
         file_client_args=file_client_args))
 
-evaluation = dict(interval=1, pipeline=eval_pipeline)
+evaluation = dict(interval=1, pipeline=eval_pipeline, pklfile_prefix="/media/ntu/volume1/home/s122md304_13/quan_fyp/second_results_3class")

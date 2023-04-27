@@ -65,7 +65,7 @@ class KittiDataset(Custom3DDataset):
                  box_type_3d='LiDAR',
                  filter_empty_gt=True,
                  test_mode=False,
-                 pcd_limit_range=[0, -40, -3, 70.4, 40, 0.0],
+                 pcd_limit_range=[0, -40, -3, 80, 40, 0.0],
                  **kwargs):
         super().__init__(
             data_root=data_root,
@@ -321,6 +321,17 @@ class KittiDataset(Custom3DDataset):
                                                   pklfile_prefix,
                                                   submission_prefix)
         return result_files, tmp_dir
+    
+    def box_range_filter(self, gt_annos, b_range = [50, 100]):
+        for gt_anno in gt_annos:
+            mask = []
+            for i in range(gt_anno['location'].shape[0]):
+                if gt_anno['location'][i,2] > b_range[0] and gt_anno['location'][i,2] < b_range[1]:
+                    mask.append(i)
+            for key in gt_anno.keys():
+                gt_anno[key] = gt_anno[key][mask]
+        return gt_annos
+                    
 
     def evaluate(self,
                  results,
@@ -330,7 +341,8 @@ class KittiDataset(Custom3DDataset):
                  submission_prefix=None,
                  show=False,
                  out_dir=None,
-                 pipeline=None):
+                 pipeline=None,
+                 range_filter=False):
         """Evaluation in KITTI protocol.
 
         Args:
@@ -358,6 +370,9 @@ class KittiDataset(Custom3DDataset):
         result_files, tmp_dir = self.format_results(results, pklfile_prefix)
         from mmdet3d.core.evaluation import kitti_eval
         gt_annos = [info['annos'] for info in self.data_infos]
+
+        if range_filter:
+            gt_annos = self.box_range_filter(gt_annos)
 
         if isinstance(result_files, dict):
             ap_dict = dict()

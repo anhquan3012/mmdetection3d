@@ -28,9 +28,10 @@ from .semantickitti_dataset import SemanticKITTIDataset
 from .sunrgbd_dataset import SUNRGBDDataset
 from .utils import get_loading_pipeline
 from .waymo_dataset import WaymoDataset
+from .simulated_dataset import SimulatedDataset
 
 __all__ = [
-    'KittiDataset', 'KittiMonoDataset', 'build_dataloader', 'DATASETS',
+    'KittiDataset', 'KittiMonoDataset', 'SimulatedDataset', 'build_dataloader', 'DATASETS',
     'build_dataset', 'NuScenesDataset', 'NuScenesMonoDataset', 'LyftDataset',
     'ObjectSample', 'RandomFlip3D', 'ObjectNoise', 'GlobalRotScaleTrans',
     'PointShuffle', 'ObjectRangeFilter', 'PointsRangeFilter',

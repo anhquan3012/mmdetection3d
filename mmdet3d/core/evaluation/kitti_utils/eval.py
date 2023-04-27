@@ -633,6 +633,7 @@ def do_eval(gt_annos,
     if '3d' in eval_types:
         ret = eval_class(gt_annos, dt_annos, current_classes, difficultys, 2,
                          min_overlaps)
+        print(ret)
         mAP11_3d = get_mAP11(ret['precision'])
         mAP40_3d = get_mAP40(ret['precision'])
     return (mAP11_bbox, mAP11_bev, mAP11_3d, mAP11_aos, mAP40_bbox, mAP40_bev,

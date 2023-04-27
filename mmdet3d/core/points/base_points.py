@@ -157,7 +157,6 @@ class BasePoints(object):
 
         if axis is None:
             axis = self.rotation_axis
-
         if rotation.numel() == 1:
             rotated_points, rot_mat_T = rotation_3d_in_axis(
                 self.tensor[:, :3][None], rotation, axis=axis, return_mat=True)

@@ -80,6 +80,7 @@ class LyftDataset(Custom3DDataset):
     def __init__(self,
                  ann_file,
                  pipeline=None,
+                 front_view_only=False,
                  data_root=None,
                  classes=None,
                  load_interval=1,
@@ -100,6 +101,7 @@ class LyftDataset(Custom3DDataset):
             test_mode=test_mode,
             **kwargs)
 
+        self.front_view_only = front_view_only
         if self.modality is None:
             self.modality = dict(
                 use_camera=False,
@@ -172,6 +174,9 @@ class LyftDataset(Custom3DDataset):
                 viewpad[:intrinsic.shape[0], :intrinsic.shape[1]] = intrinsic
                 lidar2img_rt = (viewpad @ lidar2cam_rt.T)
                 lidar2img_rts.append(lidar2img_rt)
+
+            if self.front_view_only:
+                lidar2img_rts = lidar2img_rts[0]
 
             input_dict.update(
                 dict(

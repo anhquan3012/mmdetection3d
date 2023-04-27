@@ -136,20 +136,16 @@ model = dict(
         out_channels=[256, 256]),
     bbox_head=dict(
         type='Anchor3DHead',
-        num_classes=3,
+        num_classes=1,
         in_channels=512,
         feat_channels=512,
         use_direction_classifier=True,
         anchor_generator=dict(
             type='Anchor3DRangeGenerator',
-            ranges=[
-                [0, -40.0, -0.6, 70.4, 40.0, -0.6],
-                [0, -40.0, -0.6, 70.4, 40.0, -0.6],
-                [0, -40.0, -1.78, 70.4, 40.0, -1.78],
-            ],
-            sizes=[[0.8, 0.6, 1.73], [1.76, 0.6, 1.73], [3.9, 1.6, 1.56]],
+            ranges=[[0, -40.0, -1.78, 100, 40.0, -1.78]],
+            sizes=[[3.9, 1.6, 1.56]],
             rotations=[0, 1.57],
-            reshape_out=False),
+            reshape_out=True),
         diff_rad_by_sin=True,
         bbox_coder=dict(type='DeltaXYZWLHRBBoxCoder'),
         loss_cls=dict(
@@ -158,35 +154,20 @@ model = dict(
             gamma=2.0,
             alpha=0.25,
             loss_weight=1.0),
-        loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=2.0),
+        loss_bbox=dict(
+            type='SmoothL1Loss', beta=0.1111111111111111, loss_weight=2.0),
         loss_dir=dict(
-            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=0.2)
-        ),
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=0.2)),
     # model training and testing settings
     train_cfg=dict(
-        assigner=[
-            dict(  # for Pedestrian
-                type='MaxIoUAssigner',
-                iou_calculator=dict(type='BboxOverlapsNearest3D'),
-                pos_iou_thr=0.35,
-                neg_iou_thr=0.2,
-                min_pos_iou=0.2,
-                ignore_iof_thr=-1),
-            dict(  # for Cyclist
-                type='MaxIoUAssigner',
-                iou_calculator=dict(type='BboxOverlapsNearest3D'),
-                pos_iou_thr=0.35,
-                neg_iou_thr=0.2,
-                min_pos_iou=0.2,
-                ignore_iof_thr=-1),
-            dict(  # for Car
-                type='MaxIoUAssigner',
-                iou_calculator=dict(type='BboxOverlapsNearest3D'),
-                pos_iou_thr=0.6,
-                neg_iou_thr=0.45,
-                min_pos_iou=0.45,
-                ignore_iof_thr=-1),
-        ],
+        _delete_=True,
+        assigner=dict(
+            type='MaxIoUAssigner',
+            iou_calculator=dict(type='BboxOverlapsNearest3D'),
+            pos_iou_thr=0.6,
+            neg_iou_thr=0.45,
+            min_pos_iou=0.45,
+            ignore_iof_thr=-1),
         allowed_border=0,
         pos_weight=-1,
         debug=False),
@@ -200,30 +181,24 @@ model = dict(
         max_num=50))
 
 
-# dataset settings
 dataset_type = 'KittiDataset'
 data_root = '/media/ntu/volume1/home/s122md304_13/quan_fyp/kitti/'
-class_names = ['Pedestrian', 'Cyclist', 'Car']
+class_names = ['Car']
 input_modality = dict(use_lidar=True, use_camera=False)
-
-file_client_args = dict(backend='disk')
-
 db_sampler = dict(
     data_root=data_root,
     info_path=data_root + 'kitti_dbinfos_train.pkl',
     rate=1.0,
-    prepare=dict(
-        filter_by_difficulty=[-1],
-        filter_by_min_points=dict(Car=5, Pedestrian=10, Cyclist=10)),
+    prepare=dict(filter_by_difficulty=[-1], filter_by_min_points=dict(Car=5)),
     classes=class_names,
-    sample_groups=dict(Car=12, Pedestrian=6, Cyclist=6),
-    points_loader=dict(
-        type='LoadPointsFromFile',
-        coord_type='LIDAR',
-        load_dim=4,
-        use_dim=4,
-        file_client_args=file_client_args),
-    file_client_args=file_client_args)
+    sample_groups=dict(Car=15))
+
+file_client_args = dict(backend='disk')
+# Uncomment the following if use ceph or other file clients.
+# See https://mmcv.readthedocs.io/en/latest/api.html#mmcv.fileio.FileClient
+# for more details.
+# file_client_args = dict(
+#     backend='petrel', path_mapping=dict(data='s3://kitti_data/'))
 
 train_pipeline = [
     dict(
@@ -308,46 +283,44 @@ data = dict(
         dataset=dict(
             type=dataset_type,
             data_root=data_root,
-            ann_file=data_root + 'kitti_infos_train.pkl',
+            ann_file=data_root + 'filtered_kitti_infos_train_lite.pkl',
             split='training',
-            pts_prefix='velodyne_reduced',
+            pts_prefix='filtered_velodyne',
             pipeline=train_pipeline,
             modality=input_modality,
             classes=class_names,
             test_mode=False,
             # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
             # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-            box_type_3d='LiDAR',
-            file_client_args=file_client_args)),
+            box_type_3d='LiDAR')),
     val=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'kitti_infos_val.pkl',
+        ann_file=data_root + 'filtered_kitti_infos_val_good.pkl',
         split='training',
-        pts_prefix='velodyne_reduced',
+        pts_prefix='filtered_velodyne',
         pipeline=test_pipeline,
         modality=input_modality,
         classes=class_names,
         test_mode=True,
-        box_type_3d='LiDAR',
-        file_client_args=file_client_args),
+        box_type_3d='LiDAR'),
     test=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'kitti_infos_val.pkl',
+        ann_file=data_root + 'filtered_kitti_infos_val_good.pkl',
         split='training',
-        pts_prefix='velodyne_reduced',
+        pts_prefix='filtered_velodyne',
         pipeline=test_pipeline,
         modality=input_modality,
         classes=class_names,
         test_mode=True,
-        box_type_3d='LiDAR',
-        file_client_args=file_client_args))
+        box_type_3d='LiDAR'))
 
 evaluation = dict(interval=1, pipeline=eval_pipeline)
-work_dir = '/media/ntu/volume1/home/s122md304_13/quan_fyp/train_kitti/test'
 
-checkpoint_config = dict(interval=10)
+work_dir = '/media/ntu/volume1/home/s122md304_13/quan_fyp/train_kitti/votr_car_filtered'
+
+checkpoint_config = dict(interval=1)
 log_config = dict(
     interval=1,
     hooks=[
@@ -355,7 +328,7 @@ log_config = dict(
         dict(type='TensorboardLoggerHook')
     ])
 
-lr = 0.0002
+lr = 0.00002
 optimizer = dict(type='AdamW', lr=lr, betas=(0.95, 0.99), weight_decay=0.01)
 
 lr_config = dict(
@@ -371,4 +344,5 @@ momentum_config = dict(
     step_ratio_up=0.4,
 )
 
-runner = dict(type='EpochBasedRunner', max_epochs=100)
+runner = dict(type='EpochBasedRunner', max_epochs=40)
+load_from = "/media/ntu/volume1/home/s122md304_13/quan_fyp/train_kitti/votr_car/epoch_92.pth"

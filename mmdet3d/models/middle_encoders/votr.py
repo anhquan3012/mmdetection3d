@@ -13,21 +13,6 @@ from ..builder import MIDDLE_ENCODERS
 
 from mmcv.ops import scatter_nd
 
-# def scatter_nd(indices, updates, shape):
-#     """pytorch edition of tensorflow scatter_nd.
-#     this function don't contain except handle code. so use this carefully
-#     when indice repeats, don't support repeat add which is supported
-#     in tensorflow.
-#     """
-#     ret = torch.zeros(*shape, dtype=updates.dtype, device=updates.device)
-#     ndim = indices.shape[-1]
-#     output_shape = list(indices.shape[:-1]) + shape[indices.shape[-1]:]
-#     flatted_indices = indices.view(-1, ndim)
-#     slices = [flatted_indices[:, i] for i in range(ndim)]
-#     slices += [Ellipsis]
-#     ret[slices] = updates.view(*output_shape)
-#     return ret
-
 class SparseTensor(object):
     def __init__(self, features, indices, spatial_shape, voxel_size, point_cloud_range, batch_size, hash_size, map_table = None, gather_dict = None):
         self.features = features
@@ -171,7 +156,6 @@ class SparseAttention3d(Attention3d):
         vx, vy, vz = sp_tensor.voxel_size
         new_voxel_size = [vx * self.strides[0], vy * self.strides[1], vz * self.strides[2]]
         gather_dict = self.create_gather_dict(self.attention_modes, sp_tensor.map_table, new_indices, sp_tensor.spatial_shape)
-
         voxel_features = sp_tensor.features
         v_bs_cnt = self.with_bs_cnt(sp_tensor.indices, sp_tensor.batch_size)
         k_bs_cnt = self.with_bs_cnt(new_indices, sp_tensor.batch_size)

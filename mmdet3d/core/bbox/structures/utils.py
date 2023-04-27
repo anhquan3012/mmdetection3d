@@ -189,7 +189,6 @@ def points_cam2img(points_3d, proj_mat, with_depth=False):
     """
     points_shape = list(points_3d.shape)
     points_shape[-1] = 1
-
     assert len(proj_mat.shape) == 2, 'The dimension of the projection'\
         f' matrix should be 2 instead of {len(proj_mat.shape)}.'
     d1, d2 = proj_mat.shape[:2]
@@ -210,7 +209,6 @@ def points_cam2img(points_3d, proj_mat, with_depth=False):
 
     if with_depth:
         point_2d_res = torch.cat([point_2d_res, point_2d[..., 2:3]], dim=-1)
-
     return point_2d_res
 
 

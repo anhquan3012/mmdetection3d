@@ -1,7 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import torch
 from mmcv.cnn import ConvModule
-from mmcv.runner import BaseModule
 from torch import nn as nn
 from torch.nn import functional as F
 
@@ -9,9 +8,11 @@ from mmdet3d.core.bbox.structures import (get_proj_mat_by_coord_type,
                                           points_cam2img)
 from ..builder import FUSION_LAYERS
 from . import apply_3d_transformation
+from .point_fusion import PointFusion
 
-
-def point_sample(img_meta,
+def point_sample_multi(
+                img_per_sample,
+                img_meta,
                  img_features,
                  points,
                  proj_mat,
@@ -28,7 +29,7 @@ def point_sample(img_meta,
 
     Args:
         img_meta (dict): Meta info.
-        img_features (torch.Tensor): 1 x C x H x W image features.
+        img_features (torch.Tensor): img_per_sample x C x H x W image features.
         points (torch.Tensor): Nx3 point cloud in LiDAR coordinates.
         proj_mat (torch.Tensor): 4x4 transformation matrix.
         coord_type (str): 'DEPTH' or 'CAMERA' or 'LIDAR'.
@@ -55,46 +56,52 @@ def point_sample(img_meta,
     # apply transformation based on info in img_meta
     points = apply_3d_transformation(
         points, coord_type, img_meta, reverse=True)
+    all_point_features = []
     
-    # project points to camera coordinate
-    pts_2d = points_cam2img(points, proj_mat)
+    for img_idx in range(img_per_sample):
+        # project points to camera coordinate
+        pts_2d = points_cam2img(points, proj_mat[img_idx])
 
-    # img transformation: scale -> crop -> flip
-    # the image is resized by img_scale_factor
-    img_coors = pts_2d[:, 0:2] * img_scale_factor  # Nx2
-    img_coors -= img_crop_offset
-    # grid sample, the valid grid range should be in [-1,1]
-    coor_x, coor_y = torch.split(img_coors, 1, dim=1)  # each is Nx1
+        # img transformation: scale -> crop -> flip
+        # the image is resized by img_scale_factor
+        img_coors = pts_2d[:, 0:2] * img_scale_factor  # Nx2
+        img_coors -= img_crop_offset
 
-    if img_flip:
-        # by default we take it as horizontal flip
-        # use img_shape before padding for flip
-        orig_h, orig_w = img_shape
-        coor_x = orig_w - coor_x
+        # grid sample, the valid grid range should be in [-1,1]
+        coor_x, coor_y = torch.split(img_coors, 1, dim=1)  # each is Nx1
 
-    h, w = img_pad_shape
-    coor_y = coor_y / h * 2 - 1
-    coor_x = coor_x / w * 2 - 1
-    grid = torch.cat([coor_x, coor_y],
-                     dim=1).unsqueeze(0).unsqueeze(0)  # Nx2 -> 1x1xNx2
+        if img_flip:
+            # by default we take it as horizontal flip
+            # use img_shape before padding for flip
+            orig_h, orig_w = img_shape
+            coor_x = orig_w - coor_x
 
-    # align_corner=True provides higher performance
-    mode = 'bilinear' if aligned else 'nearest'
-    point_features = F.grid_sample(
-        img_features,
-        grid,
-        mode=mode,
-        padding_mode=padding_mode,
-        align_corners=align_corners)  # 1xCx1xN feats
+        h, w = img_pad_shape
+        coor_y = coor_y / h * 2 - 1
+        coor_x = coor_x / w * 2 - 1
+        grid = torch.cat([coor_x, coor_y],
+                        dim=1).unsqueeze(0).unsqueeze(0)  # Nx2 -> 1x1xNx2
 
-    return point_features.squeeze().t()
+        # align_corner=True provides higher performance
+        mode = 'bilinear' if aligned else 'nearest'
+        curr_point_features = F.grid_sample(
+            img_features[img_idx:img_idx+1,:,:,:],
+            grid,
+            mode=mode,
+            padding_mode=padding_mode,
+            align_corners=align_corners)  # 1xCx1xN feats
+        curr_point_features = curr_point_features.squeeze().t() # NxC
+        all_point_features.append(curr_point_features)
+    all_point_features = torch.stack(all_point_features).sum(dim=0)
+    return all_point_features
 
 
 @FUSION_LAYERS.register_module()
-class PointFusion(BaseModule):
+class PointFusionMulti(PointFusion):
     """Fuse image features from multi-scale features.
 
     Args:
+        img_per_sample (int): Number of input images for each sample
         img_channels (list[int] | int): Channels of image features.
             It could be a list if the input is multi-scale image features.
         pts_channels (int): Channels of point features
@@ -127,6 +134,7 @@ class PointFusion(BaseModule):
     """
 
     def __init__(self,
+                 img_per_sample,
                  img_channels,
                  pts_channels,
                  mid_channels,
@@ -144,67 +152,24 @@ class PointFusion(BaseModule):
                  align_corners=True,
                  padding_mode='zeros',
                  lateral_conv=True):
-        super(PointFusion, self).__init__(init_cfg=init_cfg)
-        if isinstance(img_levels, int):
-            img_levels = [img_levels]
-        if isinstance(img_channels, int):
-            img_channels = [img_channels] * len(img_levels)
-        assert isinstance(img_levels, list)
-        assert isinstance(img_channels, list)
-        assert len(img_channels) == len(img_levels)
-
-        self.img_levels = img_levels
-        self.coord_type = coord_type
-        self.act_cfg = act_cfg
-        self.activate_out = activate_out
-        self.fuse_out = fuse_out
-        self.dropout_ratio = dropout_ratio
-        self.img_channels = img_channels
-        self.aligned = aligned
-        self.align_corners = align_corners
-        self.padding_mode = padding_mode
-
-        self.lateral_convs = None
-        if lateral_conv:
-            self.lateral_convs = nn.ModuleList()
-            for i in range(len(img_channels)):
-                l_conv = ConvModule(
-                    img_channels[i],
-                    mid_channels,
-                    3,
-                    padding=1,
-                    conv_cfg=conv_cfg,
-                    norm_cfg=norm_cfg,
-                    act_cfg=self.act_cfg,
-                    inplace=False)
-                self.lateral_convs.append(l_conv)
-            self.img_transform = nn.Sequential(
-                nn.Linear(mid_channels * len(img_channels), out_channels),
-                nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.01),
-            )
-        else:
-            self.img_transform = nn.Sequential(
-                nn.Linear(sum(img_channels), out_channels),
-                nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.01),
-            )
-        self.pts_transform = nn.Sequential(
-            nn.Linear(pts_channels, out_channels),
-            nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.01),
-        )
-
-        if self.fuse_out:
-            self.fuse_conv = nn.Sequential(
-                nn.Linear(mid_channels, out_channels),
-                # For pts the BN is initialized differently by default
-                # TODO: check whether this is necessary
-                nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.01),
-                nn.ReLU(inplace=False))
-
-        if init_cfg is None:
-            self.init_cfg = [
-                dict(type='Xavier', layer='Conv2d', distribution='uniform'),
-                dict(type='Xavier', layer='Linear', distribution='uniform')
-            ]
+        super(PointFusionMulti, self).__init__(img_channels,
+                 pts_channels,
+                 mid_channels,
+                 out_channels,
+                 img_levels,
+                 coord_type,
+                 conv_cfg,
+                 norm_cfg,
+                 act_cfg,
+                 init_cfg,
+                 activate_out,
+                 fuse_out,
+                 dropout_ratio,
+                 aligned,
+                 align_corners,
+                 padding_mode,
+                 lateral_conv)
+        self.img_per_sample = img_per_sample
 
     def forward(self, img_feats, pts, pts_feats, img_metas):
         """Forward function.
@@ -236,7 +201,7 @@ class PointFusion(BaseModule):
 
         Args:
             img_feats (list(torch.Tensor)): Multi-scale image features produced
-                by image backbone in shape (N, C, H, W).
+                by image backbone in shape (B*N, C, H, W).
             pts (list[torch.Tensor]): Points of each sample.
             img_metas (list[dict]): Meta information for each sample.
 
@@ -251,12 +216,13 @@ class PointFusion(BaseModule):
         else:
             img_ins = img_feats
         img_feats_per_point = []
+        img_per_sample = self.img_per_sample
         # Sample multi-level features
         for i in range(len(img_metas)):
             mlvl_img_feats = []
             for level in range(len(self.img_levels)):
                 mlvl_img_feats.append(
-                    self.sample_single(img_ins[level][i:i + 1], pts[i][:, :3],
+                    self.sample_single(img_ins[level][img_per_sample*i:img_per_sample*(i + 1)], pts[i][:, :3],
                                        img_metas[i]))
             mlvl_img_feats = torch.cat(mlvl_img_feats, dim=-1)
             img_feats_per_point.append(mlvl_img_feats)
@@ -269,7 +235,7 @@ class PointFusion(BaseModule):
 
         Args:
             img_feats (torch.Tensor): Image feature map in shape
-                (1, C, H, W).
+                (N, C, H, W).
             pts (torch.Tensor): Points of a single sample.
             img_meta (dict): Meta information of the single sample.
 
@@ -285,7 +251,8 @@ class PointFusion(BaseModule):
             pts.new_tensor(img_meta['img_crop_offset'])
             if 'img_crop_offset' in img_meta.keys() else 0)
         proj_mat = get_proj_mat_by_coord_type(img_meta, self.coord_type)
-        img_pts = point_sample(
+        img_pts = point_sample_multi(
+            img_per_sample = self.img_per_sample,
             img_meta=img_meta,
             img_features=img_feats,
             points=pts,

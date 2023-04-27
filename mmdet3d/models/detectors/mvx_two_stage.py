@@ -15,7 +15,7 @@ from mmdet.core import multi_apply
 from .. import builder
 from ..builder import DETECTORS
 from .base import Base3DDetector
-
+import cv2
 
 @DETECTORS.register_module()
 class MVXTwoStageDetector(Base3DDetector):
@@ -170,6 +170,7 @@ class MVXTwoStageDetector(Base3DDetector):
 
     def extract_img_feat(self, img, img_metas):
         """Extract features of images."""
+        # print("Image size:", img.shape)
         if self.with_img_backbone and img is not None:
             input_shape = img.shape[-2:]
             # update real input shape of each single img

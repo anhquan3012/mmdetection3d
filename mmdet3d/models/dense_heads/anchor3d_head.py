@@ -169,8 +169,6 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
             tuple[list[torch.Tensor]]: Multi-level class score, bbox
                 and direction predictions.
         """
-        print(len(feats))
-        print(feats[0].shape)
         return multi_apply(self.forward_single, feats)
 
     def get_anchors(self, featmap_sizes, input_metas, device='cuda'):
